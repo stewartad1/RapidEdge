@@ -77,3 +77,10 @@ def test_invalid_dxf_rejected():
     response = client.post("/api/dxf/parse", files=files)
     assert response.status_code == 400
     assert "Invalid DXF file" in response.json()["detail"]
+
+
+def test_empty_upload_rejected():
+    files = {"file": ("empty.dxf", b"", "application/dxf")}
+    response = client.post("/api/dxf/parse", files=files)
+    assert response.status_code == 400
+    assert "Uploaded file is empty" in response.json()["detail"]

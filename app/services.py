@@ -1,6 +1,10 @@
 import math
+import os
+import shutil
 import tempfile
 from typing import List, Optional
+
+from fastapi import UploadFile
 
 import ezdxf
 from ezdxf.entities import DXFGraphic
@@ -74,19 +78,11 @@ def _extract_entities(msp) -> List[DXFGraphic]:
     return list(msp)
 
 
-def parse_dxf(file_bytes: bytes, filename: str) -> DxfParseResponse:
+def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
     try:
-        # ezdxf expects text streams for ASCII DXF files; reading from a binary
-        # buffer triggers a bytes/str mismatch inside the tag loader. Decode to
-        # text (ignoring invalid bytes) and persist to a temporary text file so
-        # ezdxf can parse reliably.
-        text_content = file_bytes.decode("utf-8", errors="ignore")
-        with tempfile.NamedTemporaryFile(
-            mode="w+", suffix=".dxf", encoding="utf-8"
-        ) as tmp:
-            tmp.write(text_content)
-            tmp.flush()
-            doc = ezdxf.readfile(tmp.name)
+        # ezdxf reads directly from a filesystem path and handles both ASCII and
+        # binary DXF files transparently.
+        doc = ezdxf.readfile(file_path)
     except (DXFError, IOError) as exc:  # DXFError for invalid files
         raise ValueError(f"Invalid DXF file: {exc}") from exc
 
@@ -108,3 +104,28 @@ def parse_dxf(file_bytes: bytes, filename: str) -> DxfParseResponse:
         entities=entities,
         bounds=bounds,
     )
+
+
+def save_upload_to_temp(upload: UploadFile) -> str:
+    """Persist an ``UploadFile`` to a temporary file and return the path.
+
+    Using a real file path avoids issues where intermediate middleware consumes
+    the in-memory stream, since we copy from the underlying ``file`` object
+    after rewinding it.
+    """
+
+    upload.file.seek(0)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".dxf")
+    try:
+        shutil.copyfileobj(upload.file, tmp)
+        tmp.flush()
+        return tmp.name
+    finally:
+        tmp.close()
+
+
+def remove_file_safely(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
