@@ -106,18 +106,21 @@ def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
     )
 
 
-def save_upload_to_temp(upload: UploadFile) -> str:
+async def save_upload_to_temp(upload: UploadFile) -> str:
     """Persist an ``UploadFile`` to a temporary file and return the path.
 
-    Using a real file path avoids issues where intermediate middleware consumes
-    the in-memory stream, since we copy from the underlying ``file`` object
-    after rewinding it.
+    Reading the upload contents explicitly ensures we capture the file data even
+    when the underlying stream has been consumed or is waiting to be read (as
+    can happen with the Swagger "Try it out" flow). The bytes are then written
+    to a temporary DXF file path for ezdxf to consume.
     """
-
-    upload.file.seek(0)
+    await upload.seek(0)
+    contents = await upload.read()
+    if not contents:
+        raise ValueError("Uploaded file is empty.")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".dxf")
     try:
-        shutil.copyfileobj(upload.file, tmp)
+        tmp.write(contents)
         tmp.flush()
         return tmp.name
     finally:

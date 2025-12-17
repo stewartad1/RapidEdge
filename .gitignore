@@ -9,3 +9,4 @@ __pycache__/
 *.log
 .coverage
 htmlcov/
+*.egg-info/

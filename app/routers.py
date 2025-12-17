@@ -16,14 +16,9 @@ async def parse_dxf_upload(file: UploadFile = File(...)):
             detail="Unsupported file type; please upload a DXF file.",
         )
 
-    temp_path = save_upload_to_temp(file)
+    temp_path = None
     try:
-        if os.path.getsize(temp_path) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is empty.",
-            )
-
+        temp_path = await save_upload_to_temp(file)
         return parse_dxf(temp_path, file.filename)
     except ValueError as exc:
         raise HTTPException(
@@ -31,4 +26,5 @@ async def parse_dxf_upload(file: UploadFile = File(...)):
             detail=str(exc),
         ) from exc
     finally:
-        remove_file_safely(temp_path)
+        if temp_path:
+            remove_file_safely(temp_path)
