@@ -11,12 +11,11 @@ Backend service built with FastAPI that accepts DXF uploads and returns structur
    source .venv/bin/activate
    ```
 
-2. Install dependencies (run this **from the project root** so `requirements.txt` is found), then install the local package in editable mode so `app` is importable in tests:
+2. Install dependencies (run this **from the project root** so `requirements.txt` is found). The requirements file now installs the local package in editable mode, making `app` importable during tests:
    ```bash
    # verify you're in /workspace/RapidEdge or /workspaces/RapidEdge
    ls requirements.txt
    pip install -r requirements.txt
-   pip install -e .
    ```
 
 ## Running the server
