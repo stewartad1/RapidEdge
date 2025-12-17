@@ -30,6 +30,13 @@ def _render_sample(filename: str, content_type: str = "application/dxf"):
         return client.post("/api/dxf/render", files=files)
 
 
+def _measure_sample(filename: str, content_type: str = "application/dxf"):
+    sample_path = BASE_DIR / "samples" / filename
+    with sample_path.open("rb") as f:
+        files = {"file": (filename, f, content_type)}
+        return client.post("/api/dxf/render/metrics", files=files)
+
+
 def _require_rendering_deps():
     pytest.importorskip(
         "matplotlib",
@@ -103,6 +110,17 @@ def test_empty_upload_rejected():
     response = client.post("/api/dxf/parse", files=files)
     assert response.status_code == 400
     assert "Uploaded file is empty" in response.json()["detail"]
+
+
+def test_measurements_report_max_width_and_length_in_dual_units():
+    response = _measure_sample("simple_line.dxf")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert pytest.approx(payload["width_mm"], rel=1e-3) == 10.0
+    assert pytest.approx(payload["length_mm"], rel=1e-3) == 0.0
+    assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0 / 25.4
+    assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
 
 
 def test_render_returns_png_for_valid_file():

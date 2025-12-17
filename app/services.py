@@ -1,5 +1,4 @@
 import io
-import math
 import os
 import tempfile
 from typing import TYPE_CHECKING, List, Optional
@@ -10,7 +9,14 @@ import ezdxf
 from ezdxf.entities import DXFGraphic
 from ezdxf.lldxf.const import DXFError
 
-from .models import Bounds, DxfEntity, DxfLayer, DxfMetadata, DxfParseResponse
+from .models import (
+    Bounds,
+    DxfDimensions,
+    DxfEntity,
+    DxfLayer,
+    DxfMetadata,
+    DxfParseResponse,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - import-time guard for optional deps
     from ezdxf.addons.drawing import Frontend, RenderContext
@@ -20,56 +26,27 @@ if TYPE_CHECKING:  # pragma: no cover - import-time guard for optional deps
 
 
 def _compute_entity_bounds(entities: List[DXFGraphic]) -> Optional[Bounds]:
-    """Calculate bounds from supported entities for deterministic results.
+    """Calculate bounds using ezdxf's bounding box helper.
 
-    The built-in modelspace ``bbox`` helper can return ``None`` for sparse
-    content. To keep predictable bounds for our simple fixtures, we derive
-    limits from LINE and CIRCLE entities directly and ignore unsupported
-    entity types.
+    ezdxf's :class:`~ezdxf.math.BoundingBox` aggregates extents across all
+    entities and supports the full DXF entity set, so we rely on it to keep
+    measurements aligned with the library's own geometry routines.
     """
 
-    min_x = math.inf
-    min_y = math.inf
-    min_z = math.inf
-    max_x = -math.inf
-    max_y = -math.inf
-    max_z = -math.inf
+    from ezdxf import bbox as ez_bbox
 
-    for entity in entities:
-        etype = entity.dxftype()
-        if etype == "LINE":
-            start = entity.dxf.start
-            end = entity.dxf.end
-            xs = [start.x, end.x]
-            ys = [start.y, end.y]
-            zs = [start.z, end.z]
-        elif etype == "CIRCLE":
-            center = entity.dxf.center
-            r = float(entity.dxf.radius)
-            xs = [center.x - r, center.x + r]
-            ys = [center.y - r, center.y + r]
-            zs = [center.z, center.z]
-        else:
-            # Unknown entity types are skipped to avoid incorrect bounds.
-            continue
-
-        min_x = min(min_x, *xs)
-        max_x = max(max_x, *xs)
-        min_y = min(min_y, *ys)
-        max_y = max(max_y, *ys)
-        min_z = min(min_z, *zs)
-        max_z = max(max_z, *zs)
-
-    if math.isinf(min_x):
+    try:
+        bbox = ez_bbox.extents(entities)
+    except ez_bbox.BoundingBoxError:
         return None
 
     return Bounds(
-        min_x=float(min_x),
-        min_y=float(min_y),
-        min_z=float(min_z),
-        max_x=float(max_x),
-        max_y=float(max_y),
-        max_z=float(max_z),
+        min_x=float(bbox.extmin[0]),
+        min_y=float(bbox.extmin[1]),
+        min_z=float(bbox.extmin[2]),
+        max_x=float(bbox.extmax[0]),
+        max_y=float(bbox.extmax[1]),
+        max_z=float(bbox.extmax[2]),
     )
 
 
@@ -109,6 +86,49 @@ def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
         layers=layers,
         entities=entities,
         bounds=bounds,
+    )
+
+
+def measure_dxf(file_path: str) -> DxfDimensions:
+    """Calculate maximum width/length in both millimeters and inches."""
+
+    from ezdxf import bbox as ez_bbox
+    from ezdxf import units as ez_units
+
+    try:
+        doc = ezdxf.readfile(file_path)
+    except (DXFError, IOError) as exc:
+        raise ValueError(f"Invalid DXF file: {exc}") from exc
+
+    msp = doc.modelspace()
+    try:
+        bbox = ez_bbox.extents(msp)
+    except ez_bbox.BoundingBoxError as exc:
+        raise ValueError("DXF has no measurable entities.") from exc
+
+    width = float(bbox.extmax[0] - bbox.extmin[0])
+    length = float(bbox.extmax[1] - bbox.extmin[1])
+
+    raw_units = int(doc.header.get("$INSUNITS", 0) or 0)
+    base_unit_value = raw_units if raw_units > 0 else ez_units.MM
+
+    def _convert(value: float, target: int) -> float:
+        factor = ez_units.conversion_factor(base_unit_value, target)
+        return float(value * factor)
+
+    width_mm = _convert(width, ez_units.MM)
+    length_mm = _convert(length, ez_units.MM)
+    width_in = _convert(width, ez_units.IN)
+    length_in = _convert(length, ez_units.IN)
+
+    unit_label = ez_units.unit_name(base_unit_value)
+
+    return DxfDimensions(
+        width_mm=width_mm,
+        width_in=width_in,
+        length_mm=length_mm,
+        length_in=length_in,
+        source_units=unit_label,
     )
 
 

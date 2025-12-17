@@ -31,6 +31,16 @@ class DxfEntity(BaseModel):
     layer: Optional[str] = None
 
 
+class DxfDimensions(BaseModel):
+    width_mm: float = Field(..., description="Maximum width of the drawing in millimeters")
+    width_in: float = Field(..., description="Maximum width of the drawing in inches")
+    length_mm: float = Field(..., description="Maximum length of the drawing in millimeters")
+    length_in: float = Field(..., description="Maximum length of the drawing in inches")
+    source_units: str = Field(
+        ..., description="Drawing units reported from the DXF INSUNITS header value"
+    )
+
+
 class DxfParseResponse(BaseModel):
     metadata: DxfMetadata
     layers: List[DxfLayer]
