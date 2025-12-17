@@ -22,6 +22,13 @@ def _post_sample(filename: str, content_type: str = "application/dxf"):
         return client.post("/api/dxf/parse", files=files)
 
 
+def _render_sample(filename: str, content_type: str = "application/dxf"):
+    sample_path = BASE_DIR / "samples" / filename
+    with sample_path.open("rb") as f:
+        files = {"file": (filename, f, content_type)}
+        return client.post("/api/dxf/render", files=files)
+
+
 def test_parse_line_file_returns_entities_and_bounds():
     response = _post_sample("simple_line.dxf")
     assert response.status_code == 200
@@ -84,3 +91,18 @@ def test_empty_upload_rejected():
     response = client.post("/api/dxf/parse", files=files)
     assert response.status_code == 400
     assert "Uploaded file is empty" in response.json()["detail"]
+
+
+def test_render_returns_png_for_valid_file():
+    response = _render_sample("simple_line.dxf")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    content = response.content
+    assert content.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(content) > 100
+
+
+def test_render_rejects_invalid_content_type():
+    response = _render_sample("simple_line.dxf", content_type="text/plain")
+    assert response.status_code == 400
+    assert "Unsupported file type" in response.json()["detail"]

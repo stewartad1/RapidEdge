@@ -1,44 +1,12 @@
-# ---- Python bytecode / caches ----
 __pycache__/
-*.py[cod]
-*$py.class
-
-# ---- Virtual envs / environment files ----
+*.pyc
 .env
-.env.*
-.env*/
 .venv/
-venv/
-ENV/
-.envrc
-
-# ---- Editors / OS ----
+.env*/
 .vscode/
 .idea/
 .DS_Store
-
-# ---- Logs / coverage / test output ----
 *.log
 .coverage
-.coverage.*
 htmlcov/
-.pytest_cache/
-pytestdebug.log
-
-# ---- Packaging / build artifacts ----
 *.egg-info/
-dist/
-build/
-pip-wheel-metadata/
-*.whl
-
-# ---- Type checkers / linters ----
-.mypy_cache/
-.pyright/
-.ruff_cache/
-
-# ---- Jupyter ----
-.ipynb_checkpoints/
-
-# ---- Misc ----
-.cache/

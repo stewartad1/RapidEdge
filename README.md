@@ -26,6 +26,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Then POST a DXF file to `http://localhost:8000/api/dxf/parse` with form field `file`.
 
+### Rendering a preview image
+
+You can also render the uploaded DXF to a PNG preview using the ezdxf drawing
+addon. Send the DXF file to `http://localhost:8000/api/dxf/render` with the
+same `file` form field. The response is an `image/png` byte stream suitable for
+display or download.
+
 ## Testing
 
 ```bash

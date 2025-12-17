@@ -1,3 +1,4 @@
+import io
 import math
 import os
 import shutil
@@ -7,8 +8,12 @@ from typing import List, Optional
 from fastapi import UploadFile
 
 import ezdxf
+from ezdxf.addons.drawing import Frontend, RenderContext
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from ezdxf.entities import DXFGraphic
 from ezdxf.lldxf.const import DXFError
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 from .models import Bounds, DxfEntity, DxfLayer, DxfMetadata, DxfParseResponse
 
@@ -104,6 +109,35 @@ def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
         entities=entities,
         bounds=bounds,
     )
+
+
+def render_dxf_png(file_path: str) -> bytes:
+    """Render a DXF file to a PNG image using ezdxf's drawing addon.
+
+    The function keeps rendering deterministic and headless-friendly by using
+    Matplotlib's Agg backend and equal aspect ratio. It raises ``ValueError`` if
+    ezdxf cannot read the file.
+    """
+
+    try:
+        doc = ezdxf.readfile(file_path)
+    except (DXFError, IOError) as exc:
+        raise ValueError(f"Invalid DXF file: {exc}") from exc
+
+    msp = doc.modelspace()
+
+    fig = Figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_aspect("equal")
+
+    ctx = RenderContext(doc)
+    backend = MatplotlibBackend(ax)
+    Frontend(ctx, backend).draw_layout(msp, finalize=True)
+
+    canvas = FigureCanvas(fig)
+    buffer = io.BytesIO()
+    canvas.print_png(buffer)
+    return buffer.getvalue()
 
 
 async def save_upload_to_temp(upload: UploadFile) -> str:
