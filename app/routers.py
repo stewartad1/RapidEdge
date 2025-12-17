@@ -10,6 +10,7 @@ from .services import (
     remove_file_safely,
     render_dxf_png,
     save_upload_to_temp,
+    UserUnit,
 )
 
 router = APIRouter(prefix="/api/dxf", tags=["dxf"])
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api/dxf", tags=["dxf"])
 
 @router.post("/parse", response_model=DxfParseResponse)
 async def parse_dxf_upload(
-    file: UploadFile = File(...), unit: str = Form("millimeters")
+    file: UploadFile = File(...), unit: UserUnit = Form("millimeters")
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
         raise HTTPException(
@@ -41,7 +42,7 @@ async def parse_dxf_upload(
 
 @router.post("/render/metrics", response_model=DxfDimensions)
 async def render_dxf_dimensions(
-    file: UploadFile = File(...), unit: str = Form("millimeters")
+    file: UploadFile = File(...), unit: UserUnit = Form("millimeters")
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
         raise HTTPException(
@@ -65,7 +66,7 @@ async def render_dxf_dimensions(
 
 @router.post("/render", response_class=Response)
 async def render_dxf_upload(
-    file: UploadFile = File(...), unit: str = Form("millimeters")
+    file: UploadFile = File(...), unit: UserUnit = Form("millimeters")
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
         raise HTTPException(

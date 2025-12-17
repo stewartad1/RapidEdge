@@ -111,8 +111,8 @@ def test_invalid_unit_rejected():
             data={"unit": "yards"},
         )
 
-    assert response.status_code == 400
-    assert "Invalid unit" in response.json()["detail"]
+    assert response.status_code == 422
+    assert "centimeters" in str(response.json()["detail"])
 
 
 def test_invalid_dxf_rejected():
