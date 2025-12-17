@@ -76,8 +76,15 @@ def _extract_entities(msp) -> List[DXFGraphic]:
 
 def parse_dxf(file_bytes: bytes, filename: str) -> DxfParseResponse:
     try:
-        with tempfile.NamedTemporaryFile(suffix=".dxf") as tmp:
-            tmp.write(file_bytes)
+        # ezdxf expects text streams for ASCII DXF files; reading from a binary
+        # buffer triggers a bytes/str mismatch inside the tag loader. Decode to
+        # text (ignoring invalid bytes) and persist to a temporary text file so
+        # ezdxf can parse reliably.
+        text_content = file_bytes.decode("utf-8", errors="ignore")
+        with tempfile.NamedTemporaryFile(
+            mode="w+", suffix=".dxf", encoding="utf-8"
+        ) as tmp:
+            tmp.write(text_content)
             tmp.flush()
             doc = ezdxf.readfile(tmp.name)
     except (DXFError, IOError) as exc:  # DXFError for invalid files
