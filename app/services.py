@@ -175,6 +175,7 @@ def measure_dxf(file_path: str, unit: Optional[str] = None) -> DxfDimensions:
     length_mm = _convert(length, ez_units.MM)
     width_in = _convert(width, ez_units.IN)
     length_in = _convert(length, ez_units.IN)
+    square_inches = width_in * length_in
 
     unit_label = _unit_label(base_unit_value)
 
@@ -183,6 +184,7 @@ def measure_dxf(file_path: str, unit: Optional[str] = None) -> DxfDimensions:
         width_in=width_in,
         length_mm=length_mm,
         length_in=length_in,
+        square_inches=square_inches,
         source_units=unit_label,
     )
 

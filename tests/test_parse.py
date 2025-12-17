@@ -138,6 +138,7 @@ def test_measurements_report_max_width_and_length_in_dual_units():
     assert pytest.approx(payload["length_mm"], rel=1e-3) == 0.0
     assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0 / 25.4
     assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
+    assert pytest.approx(payload["square_inches"], abs=1e-6) == 0.0
 
 
 def test_measurements_respect_user_unit_override():
@@ -148,6 +149,22 @@ def test_measurements_respect_user_unit_override():
     assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0
     assert pytest.approx(payload["width_mm"], rel=1e-3) == 254.0
     assert payload["source_units"].lower().startswith("inch")
+    assert pytest.approx(payload["square_inches"], abs=1e-6) == 0.0
+
+
+def test_square_inches_calculated_from_dimensions():
+    response = _measure_sample("simple_circle.dxf")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["width_mm"] > 0
+    assert payload["length_mm"] > 0
+    expected_in_from_mm = payload["width_mm"] / 25.4
+    assert pytest.approx(payload["width_in"], rel=1e-3) == expected_in_from_mm
+    assert pytest.approx(payload["length_in"], rel=1e-3) == payload["length_mm"] / 25.4
+    assert pytest.approx(payload["square_inches"], rel=1e-6) == pytest.approx(
+        payload["width_in"] * payload["length_in"], rel=1e-6
+    )
 
 
 def test_render_returns_png_for_valid_file():

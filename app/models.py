@@ -36,6 +36,9 @@ class DxfDimensions(BaseModel):
     width_in: float = Field(..., description="Maximum width of the drawing in inches")
     length_mm: float = Field(..., description="Maximum length of the drawing in millimeters")
     length_in: float = Field(..., description="Maximum length of the drawing in inches")
+    square_inches: float = Field(
+        ..., description="Calculated area from width and length in square inches"
+    )
     source_units: str = Field(
         ..., description="Drawing units reported from the DXF INSUNITS header value"
     )
