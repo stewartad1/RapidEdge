@@ -1,21 +1,22 @@
 import io
 import math
 import os
-import shutil
 import tempfile
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from fastapi import UploadFile
 
 import ezdxf
-from ezdxf.addons.drawing import Frontend, RenderContext
-from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from ezdxf.entities import DXFGraphic
 from ezdxf.lldxf.const import DXFError
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
 
 from .models import Bounds, DxfEntity, DxfLayer, DxfMetadata, DxfParseResponse
+
+if TYPE_CHECKING:  # pragma: no cover - import-time guard for optional deps
+    from ezdxf.addons.drawing import Frontend, RenderContext
+    from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    from matplotlib.figure import Figure
 
 
 def _compute_entity_bounds(entities: List[DXFGraphic]) -> Optional[Bounds]:
@@ -118,6 +119,19 @@ def render_dxf_png(file_path: str) -> bytes:
     Matplotlib's Agg backend and equal aspect ratio. It raises ``ValueError`` if
     ezdxf cannot read the file.
     """
+
+    try:
+        from ezdxf.addons.drawing import Frontend, RenderContext
+        from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+        import matplotlib
+
+        matplotlib.use("Agg")
+        from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+        from matplotlib.figure import Figure
+    except ImportError as exc:  # pragma: no cover - exercised in integration
+        raise ValueError(
+            "Rendering dependencies missing; install matplotlib and Pillow."
+        ) from exc
 
     try:
         doc = ezdxf.readfile(file_path)

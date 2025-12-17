@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import pytest
 
 # Ensure repository root is on sys.path so "app" can be imported when pytest
 # runs from different working directories.
@@ -27,6 +28,17 @@ def _render_sample(filename: str, content_type: str = "application/dxf"):
     with sample_path.open("rb") as f:
         files = {"file": (filename, f, content_type)}
         return client.post("/api/dxf/render", files=files)
+
+
+def _require_rendering_deps():
+    pytest.importorskip(
+        "matplotlib",
+        reason="Rendering requires matplotlib; install rendering extras to run.",
+    )
+    pytest.importorskip(
+        "PIL",
+        reason="Rendering requires Pillow; install rendering extras to run.",
+    )
 
 
 def test_parse_line_file_returns_entities_and_bounds():
@@ -94,6 +106,7 @@ def test_empty_upload_rejected():
 
 
 def test_render_returns_png_for_valid_file():
+    _require_rendering_deps()
     response = _render_sample("simple_line.dxf")
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
@@ -103,6 +116,7 @@ def test_render_returns_png_for_valid_file():
 
 
 def test_render_rejects_invalid_content_type():
+    _require_rendering_deps()
     response = _render_sample("simple_line.dxf", content_type="text/plain")
     assert response.status_code == 400
     assert "Unsupported file type" in response.json()["detail"]
