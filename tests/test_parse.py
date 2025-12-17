@@ -1,4 +1,11 @@
 from pathlib import Path
+import sys
+
+# Ensure repository root is on sys.path so "app" can be imported when pytest
+# runs from different working directories.
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from fastapi.testclient import TestClient
 
