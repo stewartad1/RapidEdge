@@ -24,19 +24,22 @@ Backend service built with FastAPI that accepts DXF uploads and returns structur
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Then POST a DXF file to `http://localhost:8000/api/dxf/parse` with form field `file`.
+Then POST a DXF file to `http://localhost:8000/api/dxf/parse` with form fields:
+
+- `file`: the DXF upload
+- `unit`: one of `inches`, `millimeters`, `meters`, or `centimeters` describing the drawing's source units
 
 ### Rendering a preview image
 
 You can also render the uploaded DXF to a PNG preview using the ezdxf drawing
 addon. Send the DXF file to `http://localhost:8000/api/dxf/render` with the
-same `file` form field. The response is an `image/png` byte stream suitable for
-display or download.
+same `file` form field and the `unit` selection. The response is an `image/png`
+byte stream suitable for display or download.
 
 If you need quick measurements for the rendered object, call
-`http://localhost:8000/api/dxf/render/metrics` with the same upload. The
-response includes maximum width/length in both millimeters and inches, reported
-from ezdxf's bounding-box calculations.
+`http://localhost:8000/api/dxf/render/metrics` with the same upload and `unit`
+field. The response includes maximum width/length in both millimeters and
+inches, reported from ezdxf's bounding-box calculations.
 
 ## Testing
 

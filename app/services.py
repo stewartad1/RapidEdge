@@ -1,7 +1,7 @@
 import io
 import os
 import tempfile
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, List, Optional, Literal
 
 from fastapi import UploadFile
 
@@ -17,6 +17,54 @@ from .models import (
     DxfMetadata,
     DxfParseResponse,
 )
+
+UserUnit = Literal["inches", "millimeters", "meters", "centimeters"]
+
+USER_UNIT_TO_EZ_UNITS = {
+    "inches": ezdxf.units.IN,
+    "millimeters": ezdxf.units.MM,
+    "meters": ezdxf.units.M,
+    "centimeters": ezdxf.units.CM,
+}
+
+VALID_UNIT_LIST = ", ".join(USER_UNIT_TO_EZ_UNITS.keys())
+
+
+def _normalize_user_unit(unit: Optional[str]) -> Optional[UserUnit]:
+    if unit is None:
+        return None
+
+    normalized = unit.strip().lower()
+    if normalized not in USER_UNIT_TO_EZ_UNITS:
+        raise ValueError(
+            f"Invalid unit '{unit}'. Choose one of: {VALID_UNIT_LIST}."
+        )
+
+    return normalized  # type: ignore[return-value]
+
+
+def _resolve_base_unit(user_unit: Optional[UserUnit], header_value: Optional[int]) -> int:
+    from ezdxf import units as ez_units
+
+    if user_unit:
+        return USER_UNIT_TO_EZ_UNITS[user_unit]
+
+    try:
+        raw_units = int(header_value or 0)
+    except (TypeError, ValueError):
+        raw_units = 0
+
+    return raw_units if raw_units > 0 else ez_units.MM
+
+
+def _unit_label(unit_code: int) -> str:
+    from ezdxf.enums import InsertUnits
+
+    try:
+        return InsertUnits(unit_code).name.replace("_", " ").lower()
+    except ValueError:
+        return "unitless"
+
 
 if TYPE_CHECKING:  # pragma: no cover - import-time guard for optional deps
     from ezdxf.addons.drawing import Frontend, RenderContext
@@ -61,7 +109,9 @@ def _extract_entities(msp) -> List[DXFGraphic]:
     return list(msp)
 
 
-def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
+def parse_dxf(file_path: str, filename: str, unit: Optional[str] = None) -> DxfParseResponse:
+    normalized_unit = _normalize_user_unit(unit)
+
     try:
         # ezdxf reads directly from a filesystem path and handles both ASCII and
         # binary DXF files transparently.
@@ -70,10 +120,13 @@ def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
         raise ValueError(f"Invalid DXF file: {exc}") from exc
 
     msp = doc.modelspace()
+
+    base_unit = _resolve_base_unit(normalized_unit, doc.header.get("$INSUNITS"))
+    doc.header["$INSUNITS"] = base_unit
     metadata = DxfMetadata(
         filename=filename,
         version=doc.acad_release,
-        units=doc.header.get("$INSUNITS"),
+        units=base_unit,
     )
 
     layers = _extract_layers(doc)
@@ -89,11 +142,13 @@ def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
     )
 
 
-def measure_dxf(file_path: str) -> DxfDimensions:
+def measure_dxf(file_path: str, unit: Optional[str] = None) -> DxfDimensions:
     """Calculate maximum width/length in both millimeters and inches."""
 
     from ezdxf import bbox as ez_bbox
     from ezdxf import units as ez_units
+
+    normalized_unit = _normalize_user_unit(unit)
 
     try:
         doc = ezdxf.readfile(file_path)
@@ -109,8 +164,8 @@ def measure_dxf(file_path: str) -> DxfDimensions:
     width = float(bbox.extmax[0] - bbox.extmin[0])
     length = float(bbox.extmax[1] - bbox.extmin[1])
 
-    raw_units = int(doc.header.get("$INSUNITS", 0) or 0)
-    base_unit_value = raw_units if raw_units > 0 else ez_units.MM
+    base_unit_value = _resolve_base_unit(normalized_unit, doc.header.get("$INSUNITS", 0))
+    doc.header["$INSUNITS"] = base_unit_value
 
     def _convert(value: float, target: int) -> float:
         factor = ez_units.conversion_factor(base_unit_value, target)
@@ -121,7 +176,7 @@ def measure_dxf(file_path: str) -> DxfDimensions:
     width_in = _convert(width, ez_units.IN)
     length_in = _convert(length, ez_units.IN)
 
-    unit_label = ez_units.unit_name(base_unit_value)
+    unit_label = _unit_label(base_unit_value)
 
     return DxfDimensions(
         width_mm=width_mm,
@@ -132,7 +187,7 @@ def measure_dxf(file_path: str) -> DxfDimensions:
     )
 
 
-def render_dxf_png(file_path: str) -> bytes:
+def render_dxf_png(file_path: str, unit: Optional[str] = None) -> bytes:
     """Render a DXF file to a PNG image using ezdxf's drawing addon.
 
     The function keeps rendering deterministic and headless-friendly by using
@@ -153,11 +208,15 @@ def render_dxf_png(file_path: str) -> bytes:
             "Rendering dependencies missing; install matplotlib and Pillow."
         ) from exc
 
+    normalized_unit = _normalize_user_unit(unit)
+
     try:
         doc = ezdxf.readfile(file_path)
     except (DXFError, IOError) as exc:
         raise ValueError(f"Invalid DXF file: {exc}") from exc
 
+    base_unit = _resolve_base_unit(normalized_unit, doc.header.get("$INSUNITS"))
+    doc.header["$INSUNITS"] = base_unit
     msp = doc.modelspace()
 
     fig = Figure()

@@ -16,25 +16,28 @@ client = TestClient(app)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _post_sample(filename: str, content_type: str = "application/dxf"):
+def _post_sample(filename: str, content_type: str = "application/dxf", unit: str = "millimeters"):
     sample_path = BASE_DIR / "samples" / filename
     with sample_path.open("rb") as f:
         files = {"file": (filename, f, content_type)}
-        return client.post("/api/dxf/parse", files=files)
+        data = {"unit": unit}
+        return client.post("/api/dxf/parse", files=files, data=data)
 
 
-def _render_sample(filename: str, content_type: str = "application/dxf"):
+def _render_sample(filename: str, content_type: str = "application/dxf", unit: str = "millimeters"):
     sample_path = BASE_DIR / "samples" / filename
     with sample_path.open("rb") as f:
         files = {"file": (filename, f, content_type)}
-        return client.post("/api/dxf/render", files=files)
+        data = {"unit": unit}
+        return client.post("/api/dxf/render", files=files, data=data)
 
 
-def _measure_sample(filename: str, content_type: str = "application/dxf"):
+def _measure_sample(filename: str, content_type: str = "application/dxf", unit: str = "millimeters"):
     sample_path = BASE_DIR / "samples" / filename
     with sample_path.open("rb") as f:
         files = {"file": (filename, f, content_type)}
-        return client.post("/api/dxf/render/metrics", files=files)
+        data = {"unit": unit}
+        return client.post("/api/dxf/render/metrics", files=files, data=data)
 
 
 def _require_rendering_deps():
@@ -98,6 +101,20 @@ def test_invalid_content_type_rejected():
     assert "Unsupported file type" in response.json()["detail"]
 
 
+def test_invalid_unit_rejected():
+    sample_path = BASE_DIR / "samples" / "simple_line.dxf"
+    with sample_path.open("rb") as f:
+        files = {"file": ("simple_line.dxf", f, "application/dxf")}
+        response = client.post(
+            "/api/dxf/parse",
+            files=files,
+            data={"unit": "yards"},
+        )
+
+    assert response.status_code == 400
+    assert "Invalid unit" in response.json()["detail"]
+
+
 def test_invalid_dxf_rejected():
     files = {"file": ("bad.dxf", b"not a dxf", "application/dxf")}
     response = client.post("/api/dxf/parse", files=files)
@@ -121,6 +138,16 @@ def test_measurements_report_max_width_and_length_in_dual_units():
     assert pytest.approx(payload["length_mm"], rel=1e-3) == 0.0
     assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0 / 25.4
     assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
+
+
+def test_measurements_respect_user_unit_override():
+    response = _measure_sample("simple_line.dxf", unit="inches")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0
+    assert pytest.approx(payload["width_mm"], rel=1e-3) == 254.0
+    assert payload["source_units"].lower().startswith("inch")
 
 
 def test_render_returns_png_for_valid_file():
