@@ -1,0 +1,128 @@
+*** Begin Patch
+*** Update File: src/components/DxfUpload.tsx
+@@
+-import parseDxf from "../utils/parseDxf";
++import parseDxf, { DxfUnit } from "../utils/parseDxf";
+@@
+-  const [file, setFile] = useState<File | null>(null);
++  const [file, setFile] = useState<File | null>(null);
++  const [unit, setUnit] = useState<DxfUnit>("millimeters");
+@@
+-  const handleUpload = async () => {
++  const handleUpload = async () => {
+     if (!file) return;
+-    const parsed = await parseDxf(file);
++    const parsed = await parseDxf(file, unit);
+     onParsed(parsed);
+   };
+@@
+       <input
+         type="file"
+         accept=".dxf"
+         onChange={(event) => {
+           if (event.target.files?.[0]) {
+             setFile(event.target.files[0]);
+           }
+         }}
+       />
++      <label htmlFor="dxf-unit">Unit of measure</label>
++      <select
++        id="dxf-unit"
++        value={unit}
++        onChange={(event) => setUnit(event.target.value as DxfUnit)}
++      >
++        <option value="inches">Inches</option>
++        <option value="millimeters">Millimeters</option>
++        <option value="meters">Meters</option>
++        <option value="centimeters">Centimeters</option>
++      </select>
+       <button type="button" onClick={handleUpload} disabled={!file}>
+         Upload
+       </button>
+*** End Patch
+
+*** Begin Patch
+*** Update File: src/utils/parseDxf.ts
+@@
+-export default async function parseDxf(file: File) {
++export type DxfUnit = "inches" | "millimeters" | "meters" | "centimeters";
++
++const UNIT_TO_METERS: Record<DxfUnit, number> = {
++  inches: 0.0254,
++  millimeters: 0.001,
++  meters: 1,
++  centimeters: 0.01,
++};
++
++export default async function parseDxf(file: File, unit: DxfUnit = "millimeters") {
+   const reader = new FileReader();
+   const text = await new Promise<string>((resolve, reject) => {
+     reader.onload = () => resolve(String(reader.result));
+     reader.onerror = reject;
+     reader.readAsText(file);
+   });
+ 
+   const parser = new DxfParser();
+   const dxf = parser.parseSync(text);
+-  return normalizeEntities(dxf.entities);
++  return normalizeEntities(dxf.entities, unit);
+ }
+ 
+-function normalizeEntities(entities: any[]) {
+-  return entities.map((entity) => {
+-    switch (entity.type) {
+-      case "LINE":
+-        return {
+-          ...entity,
+-          start: { x: entity.start.x, y: entity.start.y, z: entity.start.z || 0 },
+-          end: { x: entity.end.x, y: entity.end.y, z: entity.end.z || 0 },
+-        };
+-      default:
+-        return entity;
+-    }
+-  });
++function normalizeEntities(entities: any[], unit: DxfUnit) {
++  const scale = UNIT_TO_METERS[unit];
++
++  return entities.map((entity) => {
++    const clone = { ...entity };
++
++    if (clone.start && clone.end) {
++      clone.start = scalePoint(clone.start, scale);
++      clone.end = scalePoint(clone.end, scale);
++    }
++
++    if (Array.isArray(clone.vertices)) {
++      clone.vertices = clone.vertices.map((v: any) => scalePoint(v, scale));
++    }
++
++    if (Array.isArray(clone.points)) {
++      clone.points = clone.points.map((p: any) => scalePoint(p, scale));
++    }
++
++    if (typeof clone.radius === "number") {
++      clone.radius = clone.radius * scale;
++    }
++
++    if (typeof clone.startRadius === "number") {
++      clone.startRadius = clone.startRadius * scale;
++    }
++
++    if (typeof clone.endRadius === "number") {
++      clone.endRadius = clone.endRadius * scale;
++    }
++
++    clone.unit = unit;
++    return clone;
++  });
+ }
++
++function scalePoint(point: any, scale: number) {
++  return {
++    ...point,
++    x: point.x * scale,
++    y: point.y * scale,
++    z: (point.z || 0) * scale,
++  };
++}
+*** End Patch
