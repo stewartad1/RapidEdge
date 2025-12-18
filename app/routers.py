@@ -122,17 +122,19 @@ async def render_dxf_upload(
 async def inspect_dxf_upload(
     file: UploadFile = File(...),
     join_tol: float = Form(0.0),
+    unit: DxfUnit = Form(DxfUnit.millimeters),
 ):
     """Return structured diagnostic information about entities in the uploaded DXF.
 
     Useful for debugging pierce counts and identifying entity types/vertex counts.
+    Accepts a 'unit' parameter (mm, in, etc.) to control output units for all lengths.
     """
     _validate_dxf_upload(file)
 
     temp_path = None
     try:
         temp_path = await save_upload_to_temp(file)
-        return inspect_dxf(temp_path, join_tol=join_tol)
+        return inspect_dxf(temp_path, join_tol=join_tol, unit=unit.value)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

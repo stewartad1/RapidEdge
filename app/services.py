@@ -741,7 +741,7 @@ def remove_file_safely(path: str) -> None:
         pass
 
 
-def inspect_dxf(file_path: str, join_tol: float = 0.0) -> dict:
+def inspect_dxf(file_path: str, join_tol: float = 0.0, unit: str = "millimeters") -> dict:
     """Return a JSON-serializable inspection of entities in the DXF file.
 
     The returned dict includes per-entity diagnostics (type, layer, bbox,
@@ -761,6 +761,41 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0) -> dict:
 
     from ezdxf import bbox as ez_bbox
 
+
+    total_line_length = 0.0
+
+    # Unit conversion factors (from drawing units to output units)
+    # Supported: "millimeters", "inches", "centimeters", "meters"
+    def _unit_factor(doc, target_unit: str):
+        # Try to get INSUNITS from DXF header
+        insunits = None
+        try:
+            insunits = int(doc.header.get("$INSUNITS", 0))
+        except Exception:
+            pass
+        # ezdxf INSUNITS codes: 1=inch, 4=mm, 2=feet, 5=cm, 6=m, 0=unitless
+        # Default to mm if not set
+        code_to_mm = {1: 25.4, 4: 1.0, 2: 304.8, 5: 10.0, 6: 1000.0, 0: 1.0}
+        mm_per_drawing = code_to_mm.get(insunits, 1.0)
+        if target_unit == "millimeters":
+            return mm_per_drawing
+        elif target_unit == "inches":
+            return mm_per_drawing / 25.4
+        elif target_unit == "centimeters":
+            return mm_per_drawing / 10.0
+        elif target_unit == "meters":
+            return mm_per_drawing / 1000.0
+        else:
+            return 1.0  # fallback: no conversion
+
+    # Read doc for units
+    try:
+        doc = ezdxf.readfile(file_path)
+    except (DXFError, IOError) as exc:
+        raise ValueError(f"Invalid DXF file: {exc}") from exc
+    factor = _unit_factor(doc, unit)
+    msp = doc.modelspace()
+    entities = list(msp)
     for idx, ent in enumerate(entities):
         et = ent.dxftype()
         if et in counts:
@@ -780,22 +815,31 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0) -> dict:
         # vertex / point counts depending on type
         vcount = None
         summary = None
+        length = None
         try:
+            import math
             if et == "LINE":
                 start = tuple(map(float, ent.dxf.start))
                 end = tuple(map(float, ent.dxf.end))
                 vcount = 2
                 summary = {"start": [start[0], start[1]], "end": [end[0], end[1]]}
+                length = math.hypot(end[0] - start[0], end[1] - start[1])
             elif et == "CIRCLE":
                 center = tuple(map(float, ent.dxf.center))
                 r = float(ent.dxf.radius)
                 vcount = 1
                 summary = {"center": [center[0], center[1]], "radius": r}
+                length = 2 * math.pi * r
             elif et == "ARC":
                 center = tuple(map(float, ent.dxf.center))
                 r = float(ent.dxf.radius)
                 vcount = 1
                 summary = {"center": [center[0], center[1]], "radius": r}
+                sa = float(getattr(ent.dxf, "start_angle", getattr(ent, "start_angle", 0)))
+                ea = float(getattr(ent.dxf, "end_angle", getattr(ent, "end_angle", 0)))
+                # Arc length = r * angle (in radians)
+                angle = (ea - sa) % 360
+                length = math.radians(angle) * r
             elif et in {"LWPOLYLINE", "POLYLINE"}:
                 try:
                     pts = list(ent.get_points())
@@ -804,8 +848,111 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0) -> dict:
                     pts = list(ent.vertices())
                 vcount = len(pts)
                 summary = {"points": [[float(x), float(y)] for x, y, *_ in pts]}
+                length = 0.0
+                prev = None
+                for pt in pts:
+                    x, y = float(pt[0]), float(pt[1])
+                    if prev is not None:
+                        length += math.hypot(x - prev[0], y - prev[1])
+                    prev = (x, y)
+            elif et == "SPLINE":
+                # Approximate length by tessellating the spline into line segments
+                points = []
+                try:
+                    points = ent.approximate(segments=100)
+                    points = [(float(pt[0]), float(pt[1])) for pt in points]
+                except Exception:
+                    pass
+                if not points:
+                    # fallback: use control points if available
+                    try:
+                        ctrl = ent.control_points
+                        points = [(float(pt[0]), float(pt[1])) for pt in ctrl]
+                    except Exception:
+                        points = []
+                vcount = len(points)
+                summary = {"points": [[x, y] for x, y in points]}
+                length = 0.0
+                prev = None
+                for pt in points:
+                    x, y = pt
+                    if prev is not None:
+                        length += math.hypot(x - prev[0], y - prev[1])
+                    prev = (x, y)
+                # If still zero, try to estimate by control polygon length
+                if length == 0.0 and len(points) > 1:
+                    for i in range(1, len(points)):
+                        length += math.hypot(points[i][0] - points[i-1][0], points[i][1] - points[i-1][1])
+            elif et == "ELLIPSE":
+                # Approximate ellipse arc length using parametric sampling
+                points = []
+                try:
+                    import numpy as np
+                    start_param = float(getattr(ent.dxf, "start_param", 0.0))
+                    end_param = float(getattr(ent.dxf, "end_param", 2 * math.pi))
+                    ratio = float(ent.dxf.radius_ratio)
+                    major = float(ent.dxf.major_axis.magnitude)
+                    center = tuple(map(float, ent.dxf.center))
+                    num = 100
+                    ts = np.linspace(start_param, end_param, num=num)
+                    points = [(
+                        center[0] + major * np.cos(t),
+                        center[1] + major * ratio * np.sin(t)
+                    ) for t in ts]
+                except Exception:
+                    pass
+                vcount = len(points)
+                summary = {"points": [[x, y] for x, y in points]}
+                length = 0.0
+                prev = None
+                for pt in points:
+                    x, y = pt
+                    if prev is not None:
+                        length += math.hypot(x - prev[0], y - prev[1])
+                    prev = (x, y)
+                # If still zero, estimate full ellipse circumference if possible
+                if length == 0.0:
+                    try:
+                        import math
+                        a = float(ent.dxf.major_axis.magnitude)
+                        b = a * float(ent.dxf.radius_ratio)
+                        # Ramanujan's approximation for ellipse circumference
+                        h = ((a-b)**2)/((a+b)**2) if (a+b) != 0 else 0
+                        circ = math.pi * (a + b) * (1 + (3*h)/(10 + math.sqrt(4-3*h)))
+                        length = circ
+                    except Exception:
+                        length = 0.0
+            elif et == "ELLIPSE":
+                # Approximate ellipse arc length using parametric sampling
+                try:
+                    import numpy as np
+                    start_param = float(getattr(ent.dxf, "start_param", 0.0))
+                    end_param = float(getattr(ent.dxf, "end_param", 2 * math.pi))
+                    ratio = float(ent.dxf.radius_ratio)
+                    major = float(ent.dxf.major_axis.magnitude)
+                    center = tuple(map(float, ent.dxf.center))
+                    num = 100
+                    ts = np.linspace(start_param, end_param, num=num)
+                    points = [(
+                        center[0] + major * np.cos(t),
+                        center[1] + major * ratio * np.sin(t)
+                    ) for t in ts]
+                except Exception:
+                    points = []
+                vcount = len(points)
+                summary = {"points": [[x, y] for x, y in points]}
+                length = 0.0
+                prev = None
+                for pt in points:
+                    x, y = pt
+                    if prev is not None:
+                        length += math.hypot(x - prev[0], y - prev[1])
+                    prev = (x, y)
         except Exception:
             pass
+
+        if length is not None:
+            total_line_length += length
 
         items.append(
             {
@@ -815,6 +962,7 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0) -> dict:
                 "bbox": bbox,
                 "vertex_count": vcount,
                 "summary": summary,
+                "length": _round_to(length * factor) if length is not None else None,
             }
         )
 
@@ -948,6 +1096,8 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0) -> dict:
         "entities": items,
         "connected_pierces": connected_pierces,
         "components": comp_details,
+        "total_line_length": _round_to(total_line_length * factor) if total_line_length is not None else None,
+        "output_units": unit,
     }
 
 

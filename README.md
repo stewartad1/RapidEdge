@@ -117,8 +117,32 @@ After changing either flag, restart the server and PNG renders will reflect the 
 
 ---
 
----
+### Entity lengths and total length
 
+- **POST `/api/dxf/inspect`** now also returns:
+  - For each entity: a `length` field (in the selected output unit) for every LINE, ARC, CIRCLE, POLYLINE, or LWPOLYLINE (computed using geometry).
+  - `total_line_length`: the sum of all such entity lengths in the file (in the selected output unit).
+  - `output_units`: the unit used for all length fields (matches the `unit` form parameter; default is `millimeters`).
+
+**Form parameter:** `unit` (default: `millimeters`). Accepts: `millimeters`, `inches`, `centimeters`, `meters`.
+
+Example response fields:
+```json
+{
+  ...,
+  "entities": [
+    {"index": 0, "type": "LINE", ..., "length": 12.34},
+    {"index": 1, "type": "ARC", ..., "length": 5.67},
+    ...
+  ],
+  "total_line_length": 123.45,
+  "output_units": "millimeters"
+}
+```
+
+This helps you quickly see the length of each cuttable entity and the total length for quoting or process planning.
+
+---
 
 ## Testing
 
