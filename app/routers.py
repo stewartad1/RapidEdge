@@ -20,9 +20,8 @@ router = APIRouter(prefix="/api/dxf", tags=["dxf"])
 async def parse_dxf_upload(
     file: UploadFile = File(...),
     unit: UserUnit = Form(
-        ...,
+        UserUnit.millimeters,
         description="Unit of measure for the DXF file.",
-        examples={"default": {"value": UserUnit.millimeters}},
     ),
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
@@ -49,9 +48,8 @@ async def parse_dxf_upload(
 async def render_dxf_dimensions(
     file: UploadFile = File(...),
     unit: UserUnit = Form(
-        ...,
+        UserUnit.millimeters,
         description="Unit of measure for the DXF file.",
-        examples={"default": {"value": UserUnit.millimeters}},
     ),
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
@@ -78,9 +76,8 @@ async def render_dxf_dimensions(
 async def render_dxf_upload(
     file: UploadFile = File(...),
     unit: UserUnit = Form(
-        ...,
+        UserUnit.millimeters,
         description="Unit of measure for the DXF file.",
-        examples={"default": {"value": UserUnit.millimeters}},
     ),
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
