@@ -117,14 +117,14 @@ def test_invalid_unit_rejected():
 
 def test_invalid_dxf_rejected():
     files = {"file": ("bad.dxf", b"not a dxf", "application/dxf")}
-    response = client.post("/api/dxf/parse", files=files)
+    response = client.post("/api/dxf/parse", files=files, data={"unit": "millimeters"})
     assert response.status_code == 400
     assert "Invalid DXF file" in response.json()["detail"]
 
 
 def test_empty_upload_rejected():
     files = {"file": ("empty.dxf", b"", "application/dxf")}
-    response = client.post("/api/dxf/parse", files=files)
+    response = client.post("/api/dxf/parse", files=files, data={"unit": "millimeters"})
     assert response.status_code == 400
     assert "Uploaded file is empty" in response.json()["detail"]
 
