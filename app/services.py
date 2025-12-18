@@ -850,11 +850,22 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0, unit: str = "millimeters"
                 summary = {"points": [[float(x), float(y)] for x, y, *_ in pts]}
                 length = 0.0
                 prev = None
+                first = None
                 for pt in pts:
                     x, y = float(pt[0]), float(pt[1])
                     if prev is not None:
                         length += math.hypot(x - prev[0], y - prev[1])
+                    else:
+                        first = (x, y)
                     prev = (x, y)
+                # If closed, add segment from last to first
+                is_closed = False
+                try:
+                    is_closed = bool(getattr(ent, 'closed', False)) or (hasattr(ent.dxf, 'flags') and (ent.dxf.flags & 1))
+                except Exception:
+                    pass
+                if is_closed and first and prev and prev != first:
+                    length += math.hypot(first[0] - prev[0], first[1] - prev[1])
             elif et == "SPLINE":
                 # Approximate length by tessellating the spline into line segments
                 points = []
