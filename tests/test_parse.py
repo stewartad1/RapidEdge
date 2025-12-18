@@ -121,6 +121,9 @@ def test_measurements_report_max_width_and_length_in_dual_units():
     assert pytest.approx(payload["length_mm"], rel=1e-3) == 0.0
     assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0 / 25.4
     assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
+    assert pytest.approx(payload["square_inches"], abs=1e-6) == pytest.approx(
+        payload["width_in"] * payload["length_in"], abs=1e-6
+    )
 
 
 def test_render_returns_png_for_valid_file():

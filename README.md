@@ -35,8 +35,9 @@ display or download.
 
 If you need quick measurements for the rendered object, call
 `http://localhost:8000/api/dxf/render/metrics` with the same upload. The
-response includes maximum width/length in both millimeters and inches, reported
-from ezdxf's bounding-box calculations.
+response includes maximum width/length in both millimeters and inches, plus a
+calculated bounding-box area in square inches, reported from ezdxf's
+bounding-box calculations.
 
 ## Testing
 
