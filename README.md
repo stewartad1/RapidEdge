@@ -6,14 +6,14 @@ Backend service built with FastAPI that accepts DXF uploads and returns structur
 
 1. Move into the project root (in this container it's `/workspace/RapidEdge`; in Codespaces it may be `/workspaces/RapidEdge`), then create and activate a virtual environment (optional but recommended):
    ```bash
-   cd /workspace/RapidEdge
+   cd /workspaces/RapidEdge
    python -m venv .venv
    source .venv/bin/activate
    ```
 
 2. Install dependencies (run this **from the project root** so `requirements.txt` is found). The requirements file now installs the local package in editable mode, making `app` importable during tests. Rendering support depends on `matplotlib` + `Pillow` from the same requirements file—if those optional packages cannot be installed, rendering tests will be skipped:
    ```bash
-   # verify you're in /workspace/RapidEdge or /workspaces/RapidEdge
+   # verify you're in /workspaces/RapidEdge or /workspaces/RapidEdge
    ls requirements.txt
    pip install -r requirements.txt
    ```
