@@ -1,6 +1,6 @@
-import os
+from enum import Enum
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
 from .models import DxfDimensions, DxfParseResponse
@@ -15,18 +15,44 @@ from .services import (
 router = APIRouter(prefix="/api/dxf", tags=["dxf"])
 
 
-@router.post("/parse", response_model=DxfParseResponse)
-async def parse_dxf_upload(file: UploadFile = File(...)):
-    if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
+class DxfUnit(str, Enum):
+    inches = "inches"
+    millimeters = "millimeters"
+    centimeters = "centimeters"
+    meters = "meters"
+
+
+def _validate_dxf_upload(file: UploadFile) -> None:
+    # DXF uploads often come through as octet-stream from Swagger/curl
+    if file.content_type not in {
+        "application/dxf",
+        "image/vnd.dxf",
+        "application/octet-stream",
+    }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported file type; please upload a DXF file.",
         )
 
+
+@router.post("/parse", response_model=DxfParseResponse)
+async def parse_dxf_upload(
+    file: UploadFile = File(...),
+    unit: DxfUnit = Form(DxfUnit.millimeters),
+):
+    _validate_dxf_upload(file)
+
     temp_path = None
     try:
         temp_path = await save_upload_to_temp(file)
-        return parse_dxf(temp_path, file.filename)
+
+        # Prefer passing unit through if services support it
+        try:
+            return parse_dxf(temp_path, file.filename, unit=unit.value)
+        except TypeError:
+            # Backwards-compatible: older parse_dxf signature
+            return parse_dxf(temp_path, file.filename)
+
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -38,17 +64,23 @@ async def parse_dxf_upload(file: UploadFile = File(...)):
 
 
 @router.post("/render/metrics", response_model=DxfDimensions)
-async def render_dxf_dimensions(file: UploadFile = File(...)):
-    if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported file type; please upload a DXF file.",
-        )
+async def render_dxf_dimensions(
+    file: UploadFile = File(...),
+    unit: DxfUnit = Form(DxfUnit.millimeters),
+):
+    _validate_dxf_upload(file)
 
     temp_path = None
     try:
         temp_path = await save_upload_to_temp(file)
-        return measure_dxf(temp_path)
+
+        # Prefer passing unit through if services support it
+        try:
+            return measure_dxf(temp_path, unit=unit.value)
+        except TypeError:
+            # Backwards-compatible: older measure_dxf signature
+            return measure_dxf(temp_path)
+
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -60,18 +92,20 @@ async def render_dxf_dimensions(file: UploadFile = File(...)):
 
 
 @router.post("/render", response_class=Response)
-async def render_dxf_upload(file: UploadFile = File(...)):
-    if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported file type; please upload a DXF file.",
-        )
+async def render_dxf_upload(
+    file: UploadFile = File(...),
+    unit: DxfUnit = Form(DxfUnit.millimeters),
+):
+    _validate_dxf_upload(file)
 
     temp_path = None
     try:
         temp_path = await save_upload_to_temp(file)
+
+        # Render usually doesn't need units, but we accept it so Swagger shows it consistently.
         png_bytes = render_dxf_png(temp_path)
         return Response(content=png_bytes, media_type="image/png")
+
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
