@@ -117,12 +117,12 @@ def test_measurements_report_max_width_and_length_in_dual_units():
     assert response.status_code == 200
     payload = response.json()
 
-    assert pytest.approx(payload["width_mm"], rel=1e-3) == 10.0
-    assert pytest.approx(payload["length_mm"], rel=1e-3) == 0.0
-    assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0 / 25.4
-    assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
+    assert pytest.approx(payload["object_width_mm"], rel=1e-3) == 10.0
+    assert pytest.approx(payload["object_length_mm"], rel=1e-3) == 0.0
+    assert pytest.approx(payload["object_width_in"], rel=1e-3) == 10.0 / 25.4
+    assert pytest.approx(payload["object_length_in"], abs=1e-6) == 0.0
     assert pytest.approx(payload["square_inches"], abs=1e-6) == pytest.approx(
-        payload["width_in"] * payload["length_in"], abs=1e-6
+        payload["bbox_width_in"] * payload["bbox_length_in"], abs=1e-6
     )
 
 

@@ -35,9 +35,58 @@ display or download.
 
 If you need quick measurements for the rendered object, call
 `http://localhost:8000/api/dxf/render/metrics` with the same upload. The
-response includes maximum width/length in both millimeters and inches, plus a
-calculated bounding-box area in square inches, reported from ezdxf's
+response includes several useful measurements in both millimeters and inches,
+and a calculated bounding-box area in square inches, reported from ezdxf's
 bounding-box calculations.
+
+### Measurement fields explained 📐
+
+- **object_width_in / _mm** and **object_length_in / _mm** — the object's
+  primary dimensions (legacy semantics preserved). These are derived from the
+  axis-aligned extents but named to make intent explicit: the *object* width is
+  the larger of the X/Y extents and the *object* length is the smaller.
+- **bbox_width_in / _mm** and **bbox_length_in / _mm** — the axis-aligned
+  bounding-box X and Y extents as reported by ezdxf's `bbox.extents` helper.
+  These are the raw extents in model space (rounded to 3 decimal places).
+- **obb_width_in / _mm**, **obb_length_in / _mm**, **obb_angle_deg** — the
+  **Oriented Bounding Box** (minimum-area rectangle). The OBB is the smallest
+  area rectangle (any rotation) that contains the object; `obb_angle_deg` is
+  the rotation (degrees CCW from the X axis).
+- **min_max_rect_width_in / _mm**, **min_max_rect_length_in / _mm**,
+  **min_max_rect_angle_deg** — the **min-max rectangle** minimizes the
+  maximum side length (it selects the rectangle orientation that makes the
+  largest side as small as possible). Useful when you care about the object's
+  maximum dimension irrespective of orientation.
+- **min_enclosing_square_side_in / _mm** — the side length of the **smallest
+  axis-aligned square (after rotation) that contains the object**. For an
+  equilateral triangle with side 3.21 in, this will be 3.21 in.
+- **max_edge_length_in / _mm** — the length of the longest single straight
+  segment present in the drawing (e.g., the longest LINE entity).
+- **square_inches** — area of the axis-aligned bounding box in square inches.
+
+Notes:
+- All numeric measurements are rounded to at most **three** decimal places to
+  avoid floating-point representation noise in the API responses.
+- The `source_units` field reports the INSUNITS drawing units (if present).
+
+### Disable the blue bounding box in rendered PNGs 🔵➡️❌
+
+By default rendered PNGs annotate the drawing with:
+- object lines recolored **green** and
+- an axis-aligned bounding box drawn in **blue**.
+
+You can disable the blue bounding box with a single-line change in the code:
+
+```py
+# in app/services.py near the top of the file
+DRAW_BBOX = True  # set to False to disable drawing the blue bbox
+```
+
+After changing it to `False`, restart the server and PNG renders will no
+longer draw the blue bounding box (object lines remain green).
+
+---
+
 
 ## Testing
 
