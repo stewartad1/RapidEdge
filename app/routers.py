@@ -10,6 +10,8 @@ from .services import (
     remove_file_safely,
     render_dxf_png,
     save_upload_to_temp,
+    inspect_dxf,
+    render_entity_bboxes,
 )
 
 router = APIRouter(prefix="/api/dxf", tags=["dxf"])
@@ -106,6 +108,53 @@ async def render_dxf_upload(
         png_bytes = render_dxf_png(temp_path)
         return Response(content=png_bytes, media_type="image/png")
 
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    finally:
+        if temp_path:
+            remove_file_safely(temp_path)
+
+
+@router.post("/inspect")
+async def inspect_dxf_upload(
+    file: UploadFile = File(...),
+    join_tol: float = Form(0.0),
+):
+    """Return structured diagnostic information about entities in the uploaded DXF.
+
+    Useful for debugging pierce counts and identifying entity types/vertex counts.
+    """
+    _validate_dxf_upload(file)
+
+    temp_path = None
+    try:
+        temp_path = await save_upload_to_temp(file)
+        return inspect_dxf(temp_path, join_tol=join_tol)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    finally:
+        if temp_path:
+            remove_file_safely(temp_path)
+
+
+@router.post("/render/entity_bboxes", response_class=Response)
+async def render_entity_bboxes_upload(
+    file: UploadFile = File(...),
+):
+    """Return a PNG that overlays each entity's axis-aligned bounding box with a unique color."""
+    _validate_dxf_upload(file)
+
+    temp_path = None
+    try:
+        temp_path = await save_upload_to_temp(file)
+        png_bytes = render_entity_bboxes(temp_path)
+        return Response(content=png_bytes, media_type="image/png")
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

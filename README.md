@@ -71,19 +71,51 @@ Notes:
 
 ### Disable the blue bounding box in rendered PNGs 🔵➡️❌
 
-By default rendered PNGs annotate the drawing with:
-- object lines recolored **green** and
+
+By default, rendered PNGs annotate the drawing with:
+- all object lines recolored **green** (single color for all pierces)
 - an axis-aligned bounding box drawn in **blue**.
 
-You can disable the blue bounding box with a single-line change in the code:
+To enable per-pierce coloring (each unbroken entity gets a different color), set the following in `app/services.py` and restart the server:
 
 ```py
 # in app/services.py near the top of the file
-DRAW_BBOX = True  # set to False to disable drawing the blue bbox
+COLOR_EACH_PIERCE = True    # set to True to color each pierce differently
 ```
 
-After changing it to `False`, restart the server and PNG renders will no
-longer draw the blue bounding box (object lines remain green).
+Other annotation behaviors are controlled by single-line toggles in the code:
+
+```py
+DRAW_BBOX = True            # set to False to disable drawing the blue bbox
+```
+
+After changing either flag, restart the server and PNG renders will reflect the new behavior (the change is code-level only and will not appear as a control in Swagger/OpenAPI docs).
+
+---
+
+## Diagnostics and Troubleshooting
+
+### Inspecting pierce counts and connectivity
+
+- **POST `/api/dxf/inspect`** — returns JSON diagnostics:
+  - `counts`: per-entity-type counts
+  - `number_of_pierces`: raw sum of LINE, ARC, CIRCLE, POLYLINE, LWPOLYLINE
+  - `connected_pierces`: number of connected components (entities joined by endpoints)
+  - `entities`: per-entity info (type, bbox, vertex count, summary)
+  - `components`: list of entity indices per connected pierce
+  - **Form parameter:** `join_tol` (float, default `0.0`) — tolerance (model units) for merging near-touching endpoints
+  - Example:
+    ```bash
+    curl -F "file=@YourFav.dxf" -F "join_tol=0.03" http://localhost:8000/api/dxf/inspect
+    ```
+
+- **POST `/api/dxf/render/entity_bboxes`** — returns a PNG with a colored axis-aligned bounding box and index for each entity, to visually locate entities as reported by `/api/dxf/inspect`.
+
+### Counting semantics
+- **Raw pierce count**: `number_of_pierces` = sum of LINE/CIRCLE/ARC/POLYLINE entities (conservative).
+- **Connected pierces**: `connected_pierces` merges entities that are contiguous (share endpoints). By default this requires exact zero disconnect (`join_tol=0.0`). Increase `join_tol` to merge near-touching endpoints (e.g., `0.02`–`0.04`) to treat small gaps as continuous pierces.
+
+---
 
 ---
 

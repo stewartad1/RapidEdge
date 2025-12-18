@@ -109,3 +109,14 @@ class DxfParseResponse(BaseModel):
     layers: List[DxfLayer]
     entities: List[DxfEntity]
     bounds: Optional[Bounds]
+
+    # Counts for different unbroken line entity types
+    number_of_lines: int = Field(..., description="Count of LINE entities")
+    number_of_circles: int = Field(..., description="Count of CIRCLE entities")
+    number_of_arcs: int = Field(..., description="Count of ARC entities")
+    number_of_polylines: int = Field(..., description="Count of POLYLINE/LWPOLYLINE entities")
+
+    # Total count of unbroken lines (used for pierces)
+    number_of_pierces: int = Field(
+        ..., description="Total count of unbroken line-like entities (lines, circles, arcs, polylines)"
+    )

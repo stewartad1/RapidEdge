@@ -69,6 +69,13 @@ def test_parse_line_file_returns_entities_and_bounds():
     assert bounds["min_y"] == 0
     assert bounds["max_y"] == 0
 
+    assert payload["number_of_pierces"] == 1
+    # Basic entity counts
+    assert payload["number_of_lines"] == 1
+    assert payload["number_of_circles"] == 0
+    assert payload["number_of_arcs"] == 0
+    assert payload["number_of_polylines"] == 0
+
 
 def test_parse_circle_file_returns_entities_and_bounds():
     response = _post_sample("simple_circle.dxf")
