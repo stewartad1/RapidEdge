@@ -4,7 +4,7 @@ Backend service built with FastAPI that accepts DXF uploads and returns structur
 
 ## Setup
 
-1. Move into the project root (in this container it's `/workspace/RapidEdge`; in Codespaces it may be `/workspaces/RapidEdge`), then create and activate a virtual environment (optional but recommended):
+1. Move into the project root (in this container it's `/workspace/RapidEdge`; in Codespaces it may be `/workspaces/RapidEgde`), then create and activate a virtual environment (optional but recommended):
    ```bash
    cd /workspace/RapidEdge
    python -m venv .venv
@@ -13,7 +13,7 @@ Backend service built with FastAPI that accepts DXF uploads and returns structur
 
 2. Install dependencies (run this **from the project root** so `requirements.txt` is found). The requirements file now installs the local package in editable mode, making `app` importable during tests. Rendering support depends on `matplotlib` + `Pillow` from the same requirements file—if those optional packages cannot be installed, rendering tests will be skipped:
    ```bash
-   # verify you're in /workspace/RapidEdge or /workspaces/RapidEdge
+   # verify you're in /workspace/RapidEdge or /workspaces/RapidEgde
    ls requirements.txt
    pip install -r requirements.txt
    ```
@@ -24,19 +24,23 @@ Backend service built with FastAPI that accepts DXF uploads and returns structur
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Then POST a DXF file to `http://localhost:8000/api/dxf/parse` with form field `file`.
+Then POST a DXF file to `http://localhost:8000/api/dxf/parse` with form fields:
+
+- `file`: the DXF upload
+- `unit`: one of `inches`, `millimeters`, `meters`, or `centimeters` describing the drawing's source units
 
 ### Rendering a preview image
 
 You can also render the uploaded DXF to a PNG preview using the ezdxf drawing
 addon. Send the DXF file to `http://localhost:8000/api/dxf/render` with the
-same `file` form field. The response is an `image/png` byte stream suitable for
-display or download.
+same `file` form field and the `unit` selection. The response is an `image/png`
+byte stream suitable for display or download.
 
 If you need quick measurements for the rendered object, call
-`http://localhost:8000/api/dxf/render/metrics` with the same upload. The
-response includes maximum width/length in both millimeters and inches, reported
-from ezdxf's bounding-box calculations.
+`http://localhost:8000/api/dxf/render/metrics` with the same upload and `unit`
+field. The response includes maximum width/length in both millimeters and
+inches, a `square_inches` field computed from those dimensions, and the source
+units reported from ezdxf's bounding-box calculations.
 
 ## Testing
 
