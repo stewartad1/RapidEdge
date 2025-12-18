@@ -763,6 +763,7 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0, unit: str = "millimeters"
 
 
     total_line_length = 0.0
+    total_line_length_raw = 0.0
 
     # Unit conversion factors (from drawing units to output units)
     # Supported: "millimeters", "inches", "centimeters", "meters"
@@ -963,7 +964,7 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0, unit: str = "millimeters"
             pass
 
         if length is not None:
-            total_line_length += length
+            total_line_length_raw += length * factor
 
         items.append(
             {
@@ -1107,7 +1108,7 @@ def inspect_dxf(file_path: str, join_tol: float = 0.0, unit: str = "millimeters"
         "entities": items,
         "connected_pierces": connected_pierces,
         "components": comp_details,
-        "total_line_length": _round_to(total_line_length * factor) if total_line_length is not None else None,
+        "total_line_length": _round_to(total_line_length_raw) if total_line_length_raw is not None else None,
         "output_units": unit,
     }
 
