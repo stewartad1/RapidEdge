@@ -30,11 +30,11 @@ def _render_sample(filename: str, content_type: str = "application/dxf"):
         return client.post("/api/dxf/render", files=files)
 
 
-def _measure_sample(filename: str, content_type: str = "application/dxf"):
+def _measure_sample(filename: str, content_type: str = "application/dxf", params=None):
     sample_path = BASE_DIR / "samples" / filename
     with sample_path.open("rb") as f:
         files = {"file": (filename, f, content_type)}
-        return client.post("/api/dxf/render/metrics", files=files)
+        return client.post("/api/dxf/render/metrics", files=files, params=params)
 
 
 def _require_rendering_deps():
@@ -121,6 +121,22 @@ def test_measurements_report_max_width_and_length_in_dual_units():
     assert pytest.approx(payload["length_mm"], rel=1e-3) == 0.0
     assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0 / 25.4
     assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
+
+
+def test_measurements_allow_unit_override_for_unitless_dxf():
+    baseline = _measure_sample("simple_line.dxf")
+    assert baseline.status_code == 200
+    baseline_payload = baseline.json()
+
+    response = _measure_sample("simple_line.dxf", params={"unit": "inches"})
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert pytest.approx(payload["width_in"], rel=1e-3) == 10.0
+    assert pytest.approx(payload["length_in"], abs=1e-6) == 0.0
+    assert pytest.approx(payload["width_mm"], rel=1e-3) == 10.0 * 25.4
+    assert payload["source_units"] == "Inches"
+    assert payload["width_mm"] != baseline_payload["width_mm"]
 
 
 def test_render_returns_png_for_valid_file():

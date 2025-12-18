@@ -1,7 +1,7 @@
 import io
 import os
 import tempfile
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from fastapi import UploadFile
 
@@ -16,6 +16,7 @@ from .models import (
     DxfLayer,
     DxfMetadata,
     DxfParseResponse,
+    UnitOfMeasure,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - import-time guard for optional deps
@@ -61,6 +62,31 @@ def _extract_entities(msp) -> List[DXFGraphic]:
     return list(msp)
 
 
+def _unit_code(unit: UnitOfMeasure) -> int:
+    from ezdxf import units as ez_units
+
+    unit_map: Dict[UnitOfMeasure, int] = {
+        UnitOfMeasure.MILLIMETERS: ez_units.InsertUnits.Millimeters.value,
+        UnitOfMeasure.INCHES: ez_units.InsertUnits.Inches.value,
+        UnitOfMeasure.CENTIMETERS: ez_units.InsertUnits.Centimeters.value,
+        UnitOfMeasure.METERS: ez_units.InsertUnits.Meters.value,
+    }
+
+    return unit_map[unit]
+
+
+def _resolve_base_unit(raw_units: int, fallback_unit: Optional[UnitOfMeasure]) -> int:
+    from ezdxf import units as ez_units
+
+    if raw_units > 0:
+        return raw_units
+
+    if fallback_unit is not None:
+        return _unit_code(fallback_unit)
+
+    return ez_units.InsertUnits.Millimeters.value
+
+
 def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
     try:
         # ezdxf reads directly from a filesystem path and handles both ASCII and
@@ -89,8 +115,13 @@ def parse_dxf(file_path: str, filename: str) -> DxfParseResponse:
     )
 
 
-def measure_dxf(file_path: str) -> DxfDimensions:
-    """Calculate maximum width/length in both millimeters and inches."""
+def measure_dxf(file_path: str, fallback_unit: Optional[UnitOfMeasure] = None) -> DxfDimensions:
+    """Calculate maximum width/length in both millimeters and inches.
+
+    A ``fallback_unit`` can be provided when the DXF file does not declare an
+    ``$INSUNITS`` header, allowing callers (and Swagger users) to choose how to
+    interpret the raw coordinates.
+    """
 
     from ezdxf import bbox as ez_bbox
     from ezdxf import units as ez_units
@@ -110,7 +141,7 @@ def measure_dxf(file_path: str) -> DxfDimensions:
     length = float(bbox.extmax[1] - bbox.extmin[1])
 
     raw_units = int(doc.header.get("$INSUNITS", 0) or 0)
-    base_unit_value = raw_units if raw_units > 0 else ez_units.MM
+    base_unit_value = _resolve_base_unit(raw_units, fallback_unit)
 
     def _convert(value: float, target: int) -> float:
         factor = ez_units.conversion_factor(base_unit_value, target)
@@ -121,7 +152,7 @@ def measure_dxf(file_path: str) -> DxfDimensions:
     width_in = _convert(width, ez_units.IN)
     length_in = _convert(length, ez_units.IN)
 
-    unit_label = ez_units.unit_name(base_unit_value)
+    unit_label = ez_units.InsertUnits(base_unit_value).name
 
     return DxfDimensions(
         width_mm=width_mm,

@@ -1,6 +1,14 @@
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
+
+
+class UnitOfMeasure(str, Enum):
+    INCHES = "inches"
+    MILLIMETERS = "millimeters"
+    CENTIMETERS = "centimeters"
+    METERS = "meters"
 
 
 class Bounds(BaseModel):
@@ -37,7 +45,7 @@ class DxfDimensions(BaseModel):
     length_mm: float = Field(..., description="Maximum length of the drawing in millimeters")
     length_in: float = Field(..., description="Maximum length of the drawing in inches")
     source_units: str = Field(
-        ..., description="Drawing units reported from the DXF INSUNITS header value"
+        ..., description="Resolved drawing units from DXF INSUNITS or a requested override"
     )
 
 
