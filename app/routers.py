@@ -5,12 +5,12 @@ from fastapi.responses import Response
 
 from .models import DxfDimensions, DxfParseResponse
 from .services import (
+    UserUnit,
     measure_dxf,
     parse_dxf,
     remove_file_safely,
     render_dxf_png,
     save_upload_to_temp,
-    UserUnit,
 )
 
 router = APIRouter(prefix="/api/dxf", tags=["dxf"])
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/dxf", tags=["dxf"])
 async def parse_dxf_upload(
     file: UploadFile = File(...),
     unit: UserUnit = Form(
-        "millimeters",
+        UserUnit.millimeters,
         description="Unit of measure for the DXF file.",
     ),
 ):
@@ -48,7 +48,7 @@ async def parse_dxf_upload(
 async def render_dxf_dimensions(
     file: UploadFile = File(...),
     unit: UserUnit = Form(
-        "millimeters",
+        UserUnit.millimeters,
         description="Unit of measure for the DXF file.",
     ),
 ):
@@ -76,7 +76,7 @@ async def render_dxf_dimensions(
 async def render_dxf_upload(
     file: UploadFile = File(...),
     unit: UserUnit = Form(
-        "millimeters",
+        UserUnit.millimeters,
         description="Unit of measure for the DXF file.",
     ),
 ):

@@ -1,7 +1,8 @@
 import io
 import os
 import tempfile
-from typing import TYPE_CHECKING, List, Optional, Literal
+from enum import Enum
+from typing import TYPE_CHECKING, List, Optional
 
 from fastapi import UploadFile
 
@@ -18,29 +19,36 @@ from .models import (
     DxfParseResponse,
 )
 
-UserUnit = Literal["inches", "millimeters", "meters", "centimeters"]
+class UserUnit(str, Enum):
+    inches = "inches"
+    millimeters = "millimeters"
+    meters = "meters"
+    centimeters = "centimeters"
 
 USER_UNIT_TO_EZ_UNITS = {
-    "inches": ezdxf.units.IN,
-    "millimeters": ezdxf.units.MM,
-    "meters": ezdxf.units.M,
-    "centimeters": ezdxf.units.CM,
+    UserUnit.inches: ezdxf.units.IN,
+    UserUnit.millimeters: ezdxf.units.MM,
+    UserUnit.meters: ezdxf.units.M,
+    UserUnit.centimeters: ezdxf.units.CM,
 }
 
 VALID_UNIT_LIST = ", ".join(USER_UNIT_TO_EZ_UNITS.keys())
 
 
-def _normalize_user_unit(unit: Optional[str]) -> Optional[UserUnit]:
+def _normalize_user_unit(unit: Optional[str | UserUnit]) -> Optional[UserUnit]:
     if unit is None:
         return None
 
-    normalized = unit.strip().lower()
-    if normalized not in USER_UNIT_TO_EZ_UNITS:
+    value = unit.value if isinstance(unit, UserUnit) else str(unit)
+    normalized = value.strip().lower()
+    try:
+        resolved = UserUnit(normalized)
+    except ValueError:
         raise ValueError(
             f"Invalid unit '{unit}'. Choose one of: {VALID_UNIT_LIST}."
         )
 
-    return normalized  # type: ignore[return-value]
+    return resolved
 
 
 def _resolve_base_unit(user_unit: Optional[UserUnit], header_value: Optional[int]) -> int:
