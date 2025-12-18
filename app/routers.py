@@ -1,4 +1,5 @@
 import os
+from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
@@ -14,11 +15,17 @@ from .services import (
 )
 
 router = APIRouter(prefix="/api/dxf", tags=["dxf"])
+UnitForm = Annotated[
+    UserUnit,
+    Form(
+        description="Unit of measure for the DXF file.",
+    ),
+]
 
 
 @router.post("/parse", response_model=DxfParseResponse)
 async def parse_dxf_upload(
-    file: UploadFile = File(...), unit: UserUnit = Form("millimeters")
+    file: UploadFile = File(...), unit: UnitForm = "millimeters"
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
         raise HTTPException(
@@ -42,7 +49,7 @@ async def parse_dxf_upload(
 
 @router.post("/render/metrics", response_model=DxfDimensions)
 async def render_dxf_dimensions(
-    file: UploadFile = File(...), unit: UserUnit = Form("millimeters")
+    file: UploadFile = File(...), unit: UnitForm = "millimeters"
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
         raise HTTPException(
@@ -66,7 +73,7 @@ async def render_dxf_dimensions(
 
 @router.post("/render", response_class=Response)
 async def render_dxf_upload(
-    file: UploadFile = File(...), unit: UserUnit = Form("millimeters")
+    file: UploadFile = File(...), unit: UnitForm = "millimeters"
 ):
     if file.content_type not in {"application/dxf", "image/vnd.dxf", "application/octet-stream"}:
         raise HTTPException(
